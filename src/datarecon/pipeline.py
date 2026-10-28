@@ -1,3 +1,4 @@
+
 import argparse
 import json
 import tempfile
@@ -12,6 +13,30 @@ from datarecon.run_history import record_run
 from datarecon.validation import validate_orders
 
 
+def load_customer_reference(path):
+    """Load and validate the customer reference CSV."""
+    customers = pd.read_csv(path)
+
+    if "customer_id" not in customers.columns:
+        raise ValueError(
+            "Customer reference file must contain a 'customer_id' column"
+        )
+
+    customer_ids = customers["customer_id"].astype("string").str.strip()
+
+    if customer_ids.isna().any() or customer_ids.eq("").any():
+        raise ValueError(
+            "Customer reference file contains missing customer IDs"
+        )
+
+    if customer_ids.duplicated().any():
+        raise ValueError(
+            "Customer reference file contains duplicate customer IDs"
+        )
+
+    return set(customer_ids.tolist())
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Validate, compare, and publish order data."
@@ -19,18 +44,27 @@ def main():
     parser.add_argument(
         "--source",
         default="data/sample/source_orders.csv",
+        help="Path to the source order CSV.",
     )
     parser.add_argument(
         "--target",
         default="data/sample/target_orders.csv",
+        help="Path to the target order CSV.",
+    )
+    parser.add_argument(
+        "--customers",
+        default=None,
+        help="Optional CSV containing valid customer IDs.",
     )
     parser.add_argument(
         "--output",
         default="outputs/sample",
+        help="Directory for reports and discrepancy files.",
     )
     parser.add_argument(
         "--database",
         default="outputs/datarecon.db",
+        help="Path to the SQLite database.",
     )
     parser.add_argument(
         "--batch-id",
@@ -58,9 +92,24 @@ def main():
         source_input = pd.read_csv(args.source)
         target_input = pd.read_csv(args.target)
 
-        source_valid, source_rejects = validate_orders(source_input)
-        target_valid, target_rejects = validate_orders(target_input)
+        valid_customer_ids = None
+        if args.customers:
+            valid_customer_ids = load_customer_reference(args.customers)
+            report["customer_reference"] = {
+                "file": str(Path(args.customers)),
+                "valid_customer_count": len(valid_customer_ids),
+            }
 
+        source_valid, source_rejects = validate_orders(
+            source_input,
+            valid_customer_ids=valid_customer_ids,
+        )
+        target_valid, target_rejects = validate_orders(
+            target_input,
+            valid_customer_ids=valid_customer_ids,
+        )
+
+        # Write quarantine files even when no records are rejected.
         source_rejects.to_csv(
             output_dir / "source_rejects.csv",
             index=False,
@@ -86,6 +135,8 @@ def main():
             )
 
         report.update(reconciliation)
+
+        # Restore run metadata after merging reconciliation results.
         report["run_id"] = run_id
         report["batch_id"] = args.batch_id
         report["started_at"] = started_at.isoformat()
@@ -99,7 +150,7 @@ def main():
             "target_rejected_count": len(target_rejects),
         }
 
-        # Publish the valid source records to SQLite.
+        # Publish validated source orders to SQLite.
         report["publishing"] = publish_orders(
             dataframe=source_valid,
             database_path=args.database,

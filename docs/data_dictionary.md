@@ -1,3 +1,4 @@
+
 # DataRecon Data Dictionary
 
 ## 1. Order input fields
@@ -7,14 +8,14 @@ The source and target datasets use the same expected order schema.
 | Field | Expected meaning | Validation |
 |---|---|---|
 | `order_id` | Unique identifier for an order | Required; duplicate non-empty keys are rejected |
-| `customer_id` | Identifier of the customer associated with the order | Required |
+| `customer_id` | Identifier of the customer associated with an order | Required; optionally checked against the customer reference file |
 | `order_date` | Date associated with the order | Required; must be parseable as a date |
 | `amount` | Monetary amount for the order | Required; must be numeric and non-negative |
-| `status` | Current order status | Required; normalized to lowercase |
+| `status` | Current order status | Required; normalized to lowercase and checked against allowed values |
 
 ### Allowed statuses
 
-The current validator accepts:
+The validator accepts:
 
 - `pending`
 - `completed`
@@ -31,7 +32,33 @@ The reconciliation logic uses this key to identify records that appear in only o
 
 Duplicate non-empty order IDs are treated as invalid during validation. The validator rejects every occurrence of a duplicated key rather than choosing one record arbitrarily.
 
-## 3. Validation and quarantine fields
+## 3. Customer reference and referential integrity
+
+The optional `data/sample/customers.csv` file contains the customer IDs used to validate order references.
+
+| Field | Meaning | Validation |
+|---|---|---|
+| `customer_id` | Unique identifier for a customer | Required, non-empty, and unique in the reference file |
+
+The customer reference file must contain a `customer_id` column.
+
+When the pipeline is run with `--customers`, each source and target order's `customer_id` must exist in the reference file. Orders referencing unknown customers are quarantined with the rejection reason:
+
+`invalid_reference_key:customer_id`
+
+Missing or duplicate customer IDs in the reference file cause reference-file validation to fail.
+
+If `--customers` is omitted, customer referential integrity is not checked.
+
+Example command:
+
+```cmd
+python -m datarecon.pipeline --batch-id reference-check-001 --customers data/sample/customers.csv --output outputs/reference-check --database outputs/reference-check.db
+```
+
+The supplied sample reference file contains `C001`, `C002`, `C003`, and `C004`. The target sample includes `C005`, which is intentionally absent from the reference file to demonstrate invalid-reference quarantine.
+
+## 4. Validation and quarantine fields
 
 Rejected records retain their original input fields and include additional diagnostic information.
 
@@ -48,10 +75,13 @@ Examples of rejection reasons include:
 - `invalid_order_date`
 - `invalid_status`
 - `duplicate_order_id`
+- `invalid_reference_key:customer_id`
 
 A record can have more than one rejection reason. Reasons are joined with semicolons.
 
-## 4. Reconciliation report
+Missing or unexpected order columns are treated as schema-level errors and raise a `ValueError` rather than being quarantined as individual records.
+
+## 5. Reconciliation report
 
 The JSON report summarizes the comparison between the source and target datasets.
 
@@ -71,9 +101,11 @@ The JSON report summarizes the comparison between the source and target datasets
 | `reconciliation.common_key_amount_difference` | Source shared-key amount minus target shared-key amount |
 | `reconciliation.matched` | Indicates whether the implemented reconciliation checks found differences |
 
-The exact report structure is defined by `src/datarecon/reconciliation.py`. If the report schema changes, this document should be updated to match it.
+The report also includes run metadata, validation counts, publishing results, and—when supplied—customer reference information.
 
-## 5. Discrepancy output files
+The exact report structure is defined by `src/datarecon/reconciliation.py` and `src/datarecon/pipeline.py`. If the report schema changes, this document should be updated to match it.
+
+## 6. Discrepancy output files
 
 | File | Purpose |
 |---|---|
@@ -85,7 +117,7 @@ The exact report structure is defined by `src/datarecon/reconciliation.py`. If t
 
 The files are generated in the configured output directory. Their exact columns depend on the corresponding implementation.
 
-## 6. Publishing and run history
+## 7. Publishing and run history
 
 The SQLite database stores published order records and pipeline execution history.
 
@@ -93,7 +125,9 @@ The publishing schema includes fields used to identify orders and track the batc
 
 The run-history table records execution status, timestamps, input and output counts, and error details. See `publishing.py` and `run_history.py` for the authoritative database schemas.
 
-## 7. Benchmark metrics
+Publishing uses database transactions. Automated tests verify rollback and retry behavior when a publishing operation fails.
+
+## 8. Benchmark metrics
 
 | Metric | Meaning |
 |---|---|
@@ -102,7 +136,7 @@ The run-history table records execution status, timestamps, input and output cou
 | `peak_traced_python_memory_mb` | Peak Python memory recorded by `tracemalloc`, in megabytes |
 | `reconciliation_matched` | Whether the reconciliation result reported a match |
 
-Two local benchmark runs were recorded using 100,000 source rows and 100,000 target rows.
+Two earlier local benchmark runs were recorded using 100,000 source rows and 100,000 target rows.
 
 | Metric | Run 1 | Run 2 |
 |---|---:|---:|

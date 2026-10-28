@@ -1,3 +1,4 @@
+
 import pandas as pd
 
 from datarecon.validation import validate_orders
@@ -43,8 +44,9 @@ def test_missing_required_value_is_quarantined():
 
     assert len(valid) == 1
     assert len(rejected) == 1
-    assert "missing_required_field:customer_id" in (
-        rejected.iloc[0]["rejection_reason"]
+    assert (
+        "missing_required_field:customer_id"
+        in rejected.iloc[0]["rejection_reason"]
     )
 
 
@@ -64,3 +66,22 @@ def test_malformed_amount_is_quarantined():
     assert valid.empty
     assert len(rejected) == 1
     assert "invalid_amount" in rejected.iloc[0]["rejection_reason"]
+
+
+def test_zero_amount_order_is_valid():
+    """A zero-value order is allowed by the nonnegative amount rule."""
+    data = pd.DataFrame([
+        {
+            "order_id": "O_ZERO",
+            "customer_id": "C001",
+            "order_date": "2026-10-25",
+            "amount": 0,
+            "status": "pending",
+        }
+    ])
+
+    valid, rejected = validate_orders(data)
+
+    assert len(valid) == 1
+    assert rejected.empty
+    assert valid.iloc[0]["amount"] == 0

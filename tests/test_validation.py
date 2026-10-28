@@ -1,3 +1,4 @@
+
 import pandas as pd
 import pytest
 
@@ -50,4 +51,51 @@ def test_rejects_missing_schema_column():
     ])
 
     with pytest.raises(ValueError, match="Missing required columns"):
+        validate_orders(data)
+
+
+def test_quarantines_orders_with_invalid_customer_reference():
+    data = pd.DataFrame([
+        {
+            "order_id": "O1001",
+            "customer_id": "C001",
+            "order_date": "2026-10-25",
+            "amount": 500,
+            "status": "completed",
+        },
+        {
+            "order_id": "O1002",
+            "customer_id": "C999",
+            "order_date": "2026-10-25",
+            "amount": 250,
+            "status": "pending",
+        },
+    ])
+
+    valid, rejected = validate_orders(
+        data,
+        valid_customer_ids={"C001", "C002"},
+    )
+
+    assert valid["order_id"].tolist() == ["O1001"]
+    assert rejected["order_id"].tolist() == ["O1002"]
+    assert (
+        rejected.iloc[0]["rejection_reason"]
+        == "invalid_reference_key:customer_id"
+    )
+
+
+def test_rejects_unexpected_schema_column():
+    data = pd.DataFrame([
+        {
+            "order_id": "O1001",
+            "customer_id": "C001",
+            "order_date": "2026-10-25",
+            "amount": 500,
+            "status": "completed",
+            "unexpected_field": "unexpected",
+        }
+    ])
+
+    with pytest.raises(ValueError, match="Unexpected columns"):
         validate_orders(data)

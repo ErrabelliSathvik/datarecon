@@ -88,11 +88,28 @@ Pipeline execution
 
 **pytest:** Automated tests cover validation, reconciliation, edge cases, and publishing behavior.
 
+
 ## Reliability considerations
 
-The project includes duplicate-key validation, invalid-record quarantine, batch replay protection, and automated tests. These features help identify data-quality problems and reduce the risk of accidental duplicate processing.
+The project includes duplicate order-key validation, optional customer
+referential-integrity checks, invalid-record quarantine, batch replay
+protection, and automated tests.
 
-They do not replace a complete production recovery strategy. Database transactions, error handling, and the behavior of partial pipeline failures still need to be evaluated against the implementation and tested.
+When a customer reference file is supplied with `--customers`, the pipeline
+validates customer IDs in both source and target datasets. Unknown customer
+references are quarantined before reconciliation. Missing or duplicate
+customer IDs in the reference file cause the run to fail.
+
+Missing or unexpected order columns are treated as schema-level errors.
+Unexpected columns are rejected explicitly rather than silently ignored.
+
+Publishing uses database transactions. Automated tests verify that a failed
+publishing operation rolls back its database changes and can be retried.
+
+These tests do not establish complete end-to-end recovery for every possible
+pipeline failure. Failures between reconciliation output, database publishing,
+and run-history recording may require additional recovery handling. This
+limitation should be considered before production use.
 
 ## Benchmark observations
 

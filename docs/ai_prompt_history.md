@@ -34,7 +34,7 @@ I also added protection against reusing a batch ID with different data. This hel
 
 I used AI assistance to explore test cases and investigate failures during development. For example, some publishing tests expected a return field that the implementation did not provide, while another test expected a different format for validation rejection reasons.
 
-I reviewed these mismatches, adjusted the implementation or tests where appropriate, and reran the test suite. My latest recorded test run completed with 10 passing tests in 0.57 seconds. The final result should be checked again if the code changes before submission.
+I reviewed these mismatches, adjusted the implementation or tests where appropriate, and reran the test suite. The test count and final result should reflect the latest test run performed against the exact code submitted to GitHub.
 
 ## 6. Performance testing
 

@@ -30,3 +30,6 @@ outputs/sample/*
 # Editor settings
 .vscode/
 .idea/
+
+# Generated benchmark datasets
+data/generated/
