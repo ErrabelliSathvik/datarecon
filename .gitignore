@@ -14,8 +14,13 @@ __pycache__/
 !.env.example
 
 # Generated outputs and test data
-outputs/
-data/generated/
+outputs/*
+!outputs/
+outputs/sample/
+!outputs/sample/
+outputs/sample/*
+!outputs/sample/*.csv
+!outputs/sample/*.json
 
 # Local database files
 *.db
