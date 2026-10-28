@@ -86,26 +86,23 @@ Use a new batch ID for each new batch. If you rerun a batch, make sure its data 
 
 ## Benchmark Results
 
-I ran a local benchmark using source and target CSV files containing 100,000 rows each.
+I ran two local benchmark runs using source and target CSV files containing 100,000 rows each.
 
-| Metric | Result |
-|---|---:|
-| Source rows | 100,000 |
-| Target rows | 100,000 |
-| Runtime | 25.42 seconds |
-| Source-row throughput | 3,933.53 rows/second |
-| Peak traced Python memory | 37.64 MB |
-| Source-only records | 1 |
-| Target-only records | 1 |
-| Field mismatches | 1 |
+| Metric | Run 1 | Run 2 |
+|---|---:|---:|
+| Source rows | 100,000 | 100,000 |
+| Target rows | 100,000 | 100,000 |
+| Runtime | 39.6711 seconds | 28.2016 seconds |
+| Source-row throughput | 2,520.73 rows/second | 3,545.90 rows/second |
+| Peak traced Python memory | 37.64 MB | 37.64 MB |
+| Source-only records | 1 | 1 |
+| Target-only records | 1 | 1 |
+| Field mismatches | 1 | 1 |
 
-The pipeline detected one source-only record, one target-only record, and one field mismatch. The datasets had the same number of rows, but their contents were different, so the reconciliation report correctly returned `matched: false`.
+Both runs detected one source-only record, one target-only record, and one field mismatch. Although the datasets had the same number of rows, their contents differed, so the reconciliation result was `matched: false`.
 
-These results are from a single run on my Windows machine. Performance may vary depending on the hardware, input data, and environment. The memory figure represents traced Python memory, not total process memory.
+These results come from two local runs on Windows. Runtime and throughput varied between runs, so they should be treated as observations rather than guaranteed performance. The memory figure measures peak traced Python memory, not total process memory. More repeated runs would help establish a more reliable performance baseline.
 
-## Design Choices
-
-I used pandas to load and compare tabular data, SQLite to store published records and pipeline history, and `order_id` as the key for matching orders. Synthetic data generation uses a fixed random seed so that test datasets can be reproduced.
 
 ## Limitations and Future Improvements
 

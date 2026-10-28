@@ -1,116 +1,67 @@
-\# AI Assistance and Development Notes
+# AI Assistance and Development Notes
 
+## Why I kept these notes
 
+I used AI assistance at different stages of building DataRecon. It helped me break the problem into smaller tasks, work through bugs, write tests, and make the documentation easier to follow.
 
-\## Why I kept these notes
+This document describes how I used that help during development. It is a summary of the main activities, not a word-for-word record of every conversation.
 
+## 1. Planning the project
 
+I began by dividing the reconciliation process into smaller parts: reading the input files, checking the data, comparing the source and target datasets, generating reports, and storing valid records.
 
-I used AI assistance during the development of DataRecon to help break the challenge into smaller tasks, work through implementation issues, write tests, and improve the project documentation.
+AI assistance helped me think through how to organize these responsibilities into separate modules. This made it easier to work on each part and test it independently.
 
+## 2. Building the reconciliation logic
 
+I built the reconciliation logic around `order_id`, which is used to match records between the source and target datasets.
 
-This file summarizes the main areas where I used that assistance. It is not a verbatim transcript of every prompt or response.
+The pipeline identifies records that appear in only one dataset and compares field values for matching orders. It also reports row counts and amount totals. I used sample CSV files to check whether the reports correctly reflected the differences in the input data.
 
+## 3. Validating records
 
+I added validation for missing required values, invalid amounts and dates, unsupported statuses, and duplicate order IDs.
 
-\## 1. Planning the project
+Rejected records are kept separately with their original fields, source row numbers, and rejection reasons. While developing this part, I used tests to check the output and identify cases where the implementation and expected results did not agree.
 
+## 4. Publishing data and handling repeated batches
 
+I implemented SQLite publishing and added tests for repeated batches, updates to existing orders, duplicate keys, and invalid amounts.
 
-I started by breaking the reconciliation problem into separate parts: reading the input files, validating records, comparing datasets, reporting differences, and storing valid records.
+I also added a check to prevent the same batch ID from being reused with different data. The intention is to avoid treating changed input as if it were an unchanged rerun of the original batch.
 
+## 5. Testing and debugging
 
+I used AI assistance to explore test cases and investigate failures during development. For example, some tests expected a return field that the implementation did not provide, while another expected a different format for validation rejection reasons.
 
-AI assistance helped me organize these tasks into modules so I could develop and test them independently.
+I reviewed these mismatches, adjusted the code or tests where needed, and reran the test suite. An earlier run completed with 10 passing tests. The final test result should be confirmed against the version submitted to GitHub.
 
+## 6. Performance testing
 
+I generated synthetic order datasets and ran the benchmark with 100,000 source rows and 100,000 target rows.
 
-\## 2. Building the reconciliation logic
+Two recent runs produced the following results:
 
+| Metric | Run 1 | Run 2 |
+|---|---:|---:|
+| Runtime | 39.6711 seconds | 28.2016 seconds |
+| Source-row throughput | 2,520.73 rows/second | 3,545.90 rows/second |
+| Peak traced Python memory | 37.64 MB | 37.64 MB |
 
+Both runs reported one source-only record, one target-only record, and one field mismatch. The reconciliation result was `matched: false`, even though both datasets contained the same number of rows.
 
-I worked on comparing source and target order datasets using `order\_id` as the business key.
+These measurements were taken locally on Windows. The runtime varied between runs, so they should be treated as observations rather than guaranteed performance. Peak traced Python memory is not the same as total process memory.
 
+## 7. Documentation and GitHub
 
-
-The reconciliation logic reports records found in only one dataset, field-level mismatches, row counts, and amount totals. I used sample CSV files to check whether the differences appeared in the output reports.
-
-
-
-\## 3. Validating records
-
-
-
-I added checks for missing required values, invalid amounts, invalid dates, unsupported statuses, and duplicate order IDs.
-
-
-
-I also worked on preserving rejected records with their original fields, source row numbers, and rejection reasons. The validation tests helped me find inconsistencies between the implementation and the expected output format.
-
-
-
-\## 4. Publishing data and handling repeated batches
-
-
-
-I implemented SQLite publishing and tests for repeated batches, updates to existing orders, duplicate keys, and invalid amounts.
-
-
-
-I also added batch replay protection so that a batch ID cannot be reused with different content. This helps prevent an accidental rerun from silently being treated as the original batch.
-
-
-
-\## 5. Testing and debugging
-
-
-
-I used AI assistance to develop test cases and investigate failures. For example, some publishing tests initially expected a return field that the implementation did not provide, while another test expected a different rejection-reason format.
-
-
-
-I adjusted the implementation and tests and reran the test suite. One recorded run completed with 10 passing tests; I should report the latest result from the final code rather than assume that an earlier result still applies.
-
-
-
-\## 6. Performance testing
-
-
-
-I generated reproducible synthetic order datasets and ran a benchmark against 100,000 source rows and 100,000 target rows.
-
-
-
-The recorded run took 25.4225 seconds, with a reported source throughput of 3,933.53 rows per second and peak traced Python memory of 37.64 MB.
-
-
-
-The reconciliation found one source-only record, one target-only record, and one field mismatch. These results come from one local run and are not a general performance guarantee.
-
-
-
-\## 7. Documentation and GitHub
-
-
-
-I used AI assistance to organize the README, architecture notes, data dictionary, and submission checklist. I also used guidance to configure Git, commit project files, and push the repository to GitHub.
-
-
+I used AI assistance to improve the README, architecture notes, data dictionary, and development notes. I also followed guidance for using Git, committing changes, and pushing the project to GitHub.
 
 Repository: https://github.com/ErrabelliSathvik/datarecon
 
+## Review and responsibility
 
+AI suggestions were useful during development, but I still needed to check whether the proposed solutions worked with my code. I used tests and sample data to investigate issues and verify the results.
 
-\## Review and responsibility
+I am responsible for understanding the implementation, its design choices, and its limitations so I can explain them during a review.
 
-
-
-AI-generated suggestions are not proof that a feature works. I need to verify the code, run the tests, understand the design decisions, and be able to explain the implementation.
-
-
-
-This document is a summary of the development process. Where the challenge requires original AI prompts or conversation history, those records should be supplied separately rather than represented by this summary.
-
-
-
+This document summarizes the main ways I used AI assistance. If the challenge requires the original prompts or conversation history, I will provide those separately rather than presenting this summary as a verbatim transcript.
