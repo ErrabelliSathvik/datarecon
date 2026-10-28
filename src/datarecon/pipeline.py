@@ -1,4 +1,3 @@
-
 import argparse
 import json
 import tempfile
@@ -7,15 +6,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from datarecon.reconciliation import reconcile
-from datarecon.validation import validate_orders
-from datarecon.run_history import record_run
 from datarecon.publishing import publish_orders
+from datarecon.reconciliation import reconcile
+from datarecon.run_history import record_run
+from datarecon.validation import validate_orders
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Validate, reconcile, and publish order datasets."
+        description="Validate, compare, and publish order data."
     )
     parser.add_argument(
         "--source",
@@ -36,7 +35,7 @@ def main():
     parser.add_argument(
         "--batch-id",
         required=True,
-        help="Stable identifier for the input batch.",
+        help="Identifier for the input batch.",
     )
     args = parser.parse_args()
 
@@ -63,13 +62,15 @@ def main():
         target_valid, target_rejects = validate_orders(target_input)
 
         source_rejects.to_csv(
-            output_dir / "source_rejects.csv", index=False
+            output_dir / "source_rejects.csv",
+            index=False,
         )
         target_rejects.to_csv(
-            output_dir / "target_rejects.csv", index=False
+            output_dir / "target_rejects.csv",
+            index=False,
         )
 
-        # Reconcile validated datasets only.
+        # Compare only records that passed validation.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_dir = Path(temp_dir)
             source_clean = temp_dir / "source.csv"
@@ -98,14 +99,13 @@ def main():
             "target_rejected_count": len(target_rejects),
         }
 
-        # Publish source records that passed validation.
-        publishing = publish_orders(
+        # Publish the valid source records to SQLite.
+        report["publishing"] = publish_orders(
             dataframe=source_valid,
             database_path=args.database,
             batch_id=args.batch_id,
             source_file=str(Path(args.source)),
         )
-        report["publishing"] = publishing
 
         has_rejects = (
             not source_rejects.empty
@@ -124,7 +124,8 @@ def main():
 
     report["completed_at"] = datetime.now(timezone.utc).isoformat()
 
-    (output_dir / "reconciliation_report.json").write_text(
+    report_path = output_dir / "reconciliation_report.json"
+    report_path.write_text(
         json.dumps(report, indent=2),
         encoding="utf-8",
     )
