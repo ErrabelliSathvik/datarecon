@@ -1,4 +1,3 @@
-
 import pandas as pd
 
 
@@ -19,17 +18,8 @@ VALID_STATUSES = {
 
 
 def validate_orders(dataframe: pd.DataFrame):
-    """
-    Validate order records.
+    """Separate valid orders from records that fail validation."""
 
-    Returns:
-        valid: Normalized records suitable for publishing.
-        rejected: Original input fields plus source row number
-                  and one or more rejection reasons.
-
-    Source row numbers are 1-based data-row numbers, excluding
-    the CSV header.
-    """
     missing_columns = [
         column
         for column in REQUIRED_COLUMNS
@@ -43,115 +33,101 @@ def validate_orders(dataframe: pd.DataFrame):
 
     original = dataframe.copy().reset_index(drop=True)
     original_columns = list(original.columns)
+    row_count = len(original)
 
-    # Preserve original values for quarantine and debugging.
+    # Keep the original row numbers for rejected records.
     working = original.copy()
-    working["_source_row_number"] = range(1, len(working) + 1)
-
-    reasons = [[] for _ in range(len(working))]
+    working["_source_row_number"] = range(1, row_count + 1)
+    reasons = [[] for _ in range(row_count)]
 
     def reject(mask, reason):
-        for position in range(len(working)):
-            if bool(mask.iloc[position]):
+        """Record why each matching row failed validation."""
+        mask = pd.Series(mask).reset_index(drop=True)
+        mask = mask.fillna(False).astype(bool)
+
+        for position, invalid in enumerate(mask):
+            if invalid:
                 reasons[position].append(reason)
 
-    # Required-field checks.
-    for column in ["order_id", "customer_id", "order_date", "amount", "status"]:
+    # Check required fields.
+    for column in REQUIRED_COLUMNS:
         values = working[column].astype("string").str.strip()
-        reject(
-            working[column].isna() | values.eq("").fillna(False),
-            f"missing_{column}",
+        missing = (
+            working[column].isna()
+            | values.eq("").fillna(False)
         )
+        reject(missing, f"missing_{column}")
 
-    # Amount checks.
-    numeric_amount = pd.to_numeric(
-        working["amount"], errors="coerce"
-    )
+    # Check amounts.
+    amounts = pd.to_numeric(working["amount"], errors="coerce")
+    reject(amounts.isna(), "invalid_amount")
+    reject(amounts.lt(0).fillna(False), "negative_amount")
 
-    reject(
-        numeric_amount.isna(),
-        "invalid_amount",
-    )
+    # Check order dates.
+    dates = pd.to_datetime(working["order_date"], errors="coerce")
+    reject(dates.isna(), "invalid_order_date")
 
-    reject(
-        numeric_amount.lt(0).fillna(False),
-        "negative_amount",
-    )
-
-    # Date checks.
-    parsed_dates = pd.to_datetime(
-        working["order_date"], errors="coerce"
-    )
-
-    reject(
-        parsed_dates.isna(),
-        "invalid_order_date",
-    )
-
-    # Status checks.
-    normalized_status = (
+    # Check order statuses.
+    statuses = (
         working["status"]
         .astype("string")
         .str.strip()
         .str.lower()
     )
+    reject(~statuses.isin(VALID_STATUSES), "invalid_status")
 
-    reject(
-        ~normalized_status.isin(VALID_STATUSES),
-        "invalid_status",
+    # Reject all occurrences of duplicate, non-empty order IDs.
+    order_ids = working["order_id"].astype("string").str.strip()
+    has_order_id = (
+        order_ids.notna()
+        & order_ids.ne("").fillna(False)
     )
+    duplicates = order_ids.duplicated(keep=False) & has_order_id
+    reject(duplicates, "duplicate_order_id")
 
-    # Reject every occurrence of a duplicate non-empty business key.
-    normalized_key = (
-        working["order_id"]
-        .astype("string")
-        .str.strip()
-    )
+    rejected_positions = [
+        position
+        for position, row_reasons in enumerate(reasons)
+        if row_reasons
+    ]
+    valid_positions = [
+        position
+        for position, row_reasons in enumerate(reasons)
+        if not row_reasons
+    ]
 
-    nonempty_key = (
-        normalized_key.notna()
-        & normalized_key.ne("").fillna(False)
-    )
-
-    duplicate_key = (
-        normalized_key.duplicated(keep=False)
-        & nonempty_key
-    )
-
-    reject(
-        duplicate_key,
-        "duplicate_order_id",
-    )
-
-    rejected_mask = pd.Series(
-        [bool(row_reasons) for row_reasons in reasons],
-        index=working.index,
-    )
-
-    # Quarantine retains the original fields and adds audit metadata.
-    rejected = original.loc[rejected_mask].copy()
+    # Keep original values in the rejection output.
+    rejected = original.iloc[rejected_positions].copy()
     rejected.insert(
         0,
         "source_row_number",
-        working.loc[rejected_mask, "_source_row_number"].tolist(),
+        [position + 1 for position in rejected_positions],
     )
     rejected["rejection_reason"] = [
         ";".join(reasons[position])
-        for position in range(len(reasons))
-        if reasons[position]
+        for position in rejected_positions
     ]
 
-    # Only clean records proceed to publishing.
-    valid = working.loc[~rejected_mask, original_columns].copy()
+    # Normalize records that passed validation.
+    valid = original.iloc[valid_positions].copy()
 
     valid["order_id"] = valid["order_id"].astype(str).str.strip()
     valid["customer_id"] = valid["customer_id"].astype(str).str.strip()
     valid["order_date"] = pd.to_datetime(
-        valid["order_date"]
+        valid["order_date"],
+        errors="raise",
     ).dt.strftime("%Y-%m-%d")
-    valid["amount"] = pd.to_numeric(valid["amount"])
+    valid["amount"] = pd.to_numeric(valid["amount"], errors="raise")
     valid["status"] = (
-        valid["status"].astype(str).str.strip().str.lower()
+        valid["status"]
+        .astype(str)
+        .str.strip()
+        .str.lower()
     )
 
-    return valid.reset_index(drop=True), rejected.reset_index(drop=True)
+    valid = valid[original_columns]
+
+    return (
+        valid.reset_index(drop=True),
+        rejected.reset_index(drop=True),
+    )
