@@ -1,198 +1,97 @@
-\# DataRecon — System Architecture
+# DataRecon System Architecture
 
+## Overview
 
+DataRecon is a Python project that compares source and target order datasets to find missing records, mismatched values, and invalid data. It uses CSV files as input, pandas for data processing, and SQLite to store published orders and pipeline run history.
 
-\## 1. Overview
+I separated the main tasks into different modules so that validation, reconciliation, and publishing can be tested independently.
 
-
-
-DataRecon is a local data reconciliation pipeline that validates source and target order datasets, identifies discrepancies, quarantines invalid records, and publishes valid source records to a SQLite database.
-
-
-
-\## 2. Architecture
-
-
+## How the Architecture Works
 
 ```text
-
-Source CSV                 Target CSV
-
-&#x20;   |                           |
-
-&#x20;   v                           v
-
-Source Validation         Target Validation
-
-&#x20;   |                           |
-
-&#x20;   v                           v
-
-Source Rejects            Target Rejects
-
-&#x20;   |                           |
-
-&#x20;   +-------------+-------------+
-
-&#x20;                 |
-
-&#x20;                 v
-
-&#x20;         Reconciliation Engine
-
-&#x20;                 |
-
-&#x20;       +---------+---------+
-
-&#x20;       |         |         |
-
-&#x20;       v         v         v
-
-&#x20;   Source-only Target-only Field mismatches
-
-&#x20;                 |
-
-&#x20;                 v
-
-&#x20;         JSON Report + CSVs
-
+Source CSV                  Target CSV
+    |                            |
+    v                            v
+Source Validation          Target Validation
+    |                            |
+    v                            v
+Source Rejects              Target Rejects
+    |                            |
+    +-------------+--------------+
+                  |
+                  v
+          Reconciliation
+                  |
+         +--------+--------+
+         |        |        |
+         v        v        v
+     Source-only Target-only Field mismatches
+                  |
+                  v
+        JSON Report and CSV Files
 
 
 Validated Source Records
-
-&#x20;          |
-
-&#x20;          v
-
-&#x20;   SQLite Publishing
-
-&#x20;          |
-
-&#x20;          v
-
-&#x20;   Published Orders
-
+           |
+           v
+     SQLite Publishing
+           |
+           v
+      Published Orders
 
 
 Pipeline Execution
-
-&#x20;          |
-
-&#x20;          v
-
-&#x20;     Run History
-
+           |
+           v
+        Run History
 ```
 
+## Main Components
 
+### Validation
 
-\## 3. Main Components
+The validation module checks required fields, amounts, dates, order statuses, and duplicate order IDs. Records that fail validation are separated from valid records, with their original data and rejection reasons preserved for review.
 
+### Reconciliation
 
+The reconciliation module uses `order_id` to match records between the two datasets. It identifies records found in only one dataset and compares field values for matching orders. It also reports row counts and amount totals.
 
-\### Validation
+### Database Publishing
 
+The publishing module writes validated source records to SQLite. Existing orders can be updated when a later batch contains new values. Batch replay protection also checks whether a batch ID has already been used with different data.
 
+### Run History
 
-Checks required fields, numeric amounts, order dates, permitted statuses, and duplicate business keys. Invalid records are quarantined with source row numbers and rejection reasons.
+The run-history module stores information about pipeline executions, including their status, timestamps, row counts, and errors. This makes it easier to review previous runs.
 
+### Synthetic Data Generation
 
+A separate script generates test datasets using a fixed random seed. This makes it possible to reproduce test data and run benchmarks with consistent inputs.
 
-\### Reconciliation
+## Pipeline Flow
 
+1. Load the source and target CSV files.
+2. Validate the records in both datasets.
+3. Save invalid records to separate quarantine files.
+4. Compare the validated datasets using the business key.
+5. Generate a JSON report and CSV files containing the differences.
+6. Publish valid source records to SQLite.
+7. Save the execution result in the run-history database.
 
+## Reliability
 
-Uses `order\_id` as the business key. Identifies records that exist only in one dataset and field-level differences between records with matching keys. Also reports row counts and aggregate amounts.
+The project includes checks for invalid data and duplicate business keys. Rejected records retain information about why they failed validation. The publishing logic also includes batch replay protection, and automated tests cover several normal and invalid input scenarios.
 
+The fixed random seed helps reproduce the synthetic datasets used during testing.
 
+## Design Choices
 
-\### Publishing
+I used CSV because the input and output files are easy to inspect without additional infrastructure. Pandas makes it convenient to compare tabular data, while SQLite provides persistent storage without requiring a separate database server.
 
+This setup works well for a local prototype. However, pandas can consume more memory as datasets grow, and SQLite may not be the best choice for a distributed system with many concurrent writers.
 
+## Limitations and Future Improvements
 
-Publishes validated source records into SQLite. Business-key upserts allow existing orders to be updated. Batch replay protection prevents a previously used batch ID from being reused with different content.
+The current implementation focuses on local batch processing. Some areas that could be improved include structured logging, configurable validation rules, schema versioning, better recovery from partial failures, and chunked processing for larger datasets.
 
-
-
-\### Run History
-
-
-
-Stores pipeline execution status, timestamps, row counts, and error details in SQLite.
-
-
-
-\### Synthetic Data Generation
-
-
-
-Creates reproducible order datasets using a fixed random seed. Generated datasets can be used for correctness tests and performance benchmarks.
-
-
-
-\## 4. Data Flow
-
-
-
-1\. Read the source and target CSV files.
-
-2\. Validate both datasets.
-
-3\. Save invalid records to quarantine outputs.
-
-4\. Reconcile the valid datasets.
-
-5\. Produce the JSON report and discrepancy CSV files.
-
-6\. Publish validated source records to SQLite.
-
-7\. Record the execution result in run history.
-
-
-
-\## 5. Reliability Considerations
-
-
-
-\- Required-field and domain validation.
-
-\- Duplicate business-key detection.
-
-\- Quarantine with rejection reasons.
-
-\- Database transactions.
-
-\- Idempotent batch replay handling.
-
-\- Automated tests for normal and invalid inputs.
-
-\- Reproducible synthetic datasets.
-
-
-
-\## 6. Design Trade-offs
-
-
-
-\- \*\*CSV:\*\* Simple and portable, but not ideal for concurrent high-volume ingestion.
-
-\- \*\*Pandas:\*\* Convenient for tabular comparison, but can consume substantial memory for large datasets.
-
-\- \*\*SQLite:\*\* Easy to run locally without a database server, but less suitable for distributed concurrent workloads.
-
-\- \*\*Batch processing:\*\* Supports repeatable runs, though large datasets may eventually require chunked processing.
-
-
-
-\## 7. Known Limitations
-
-
-
-This implementation is a local prototype. Production hardening could include structured logging, schema versioning, configurable business rules, stronger recovery workflows, and chunked processing.
-
-
-
-Performance claims must be based on measured benchmark results.
-
-
-
+The benchmark results should be interpreted in the context of the machine and dataset used for testing. Repeated runs would provide a more reliable view of performance.
