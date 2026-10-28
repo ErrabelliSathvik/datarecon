@@ -1,164 +1,53 @@
-\# AI Prompt History — DataRecon
+# AI Assistance During DataRecon Development
 
+## Introduction
 
+I used AI assistance while developing DataRecon to understand the requirements, organize the project, work through implementation problems, and improve the documentation. This file summarizes the main areas where I used AI during development.
 
-\## Purpose
+## 1. Project Planning
 
+I started by breaking the data reconciliation challenge into smaller tasks. AI helped me plan the project structure and identify the main components, including data validation, reconciliation, discrepancy reporting, and database publishing.
 
+## 2. Reconciliation
 
-This document records how AI assistance was used while developing the DataRecon data reconciliation pipeline.
+I worked on comparing source and target order datasets using `order_id` as the business key. The reconciliation process identifies records that exist in only one dataset, differences in matching records, row counts, and amount totals.
 
+I used sample datasets to check whether the reports correctly identified the differences between the two files.
 
+## 3. Data Validation
 
-The entries below summarize the development topics covered. They are not verbatim transcripts of the original prompts.
+I implemented validation checks for missing required fields, invalid amounts, incorrect dates, unsupported order statuses, and duplicate order IDs. I also worked on keeping rejected records with their original data, source row numbers, and reasons for rejection.
 
+The validation tests helped me identify and fix issues with rejection messages and row tracking.
 
+## 4. Database Publishing
 
-\## 1. Project Planning
+I worked on publishing valid order records to SQLite. The publishing logic supports updating existing orders and checking whether a batch has already been processed.
 
+I added tests for repeated batches, updates to existing orders, changed data under the same batch ID, duplicate order IDs, and negative amounts.
 
+## 5. Testing and Debugging
 
-\*\*Goal:\*\* Break the data reconciliation challenge into manageable components.
+AI assistance helped me develop test cases and investigate errors during implementation. Some failures occurred because the tests expected different return fields or rejection-reason formats than the code provided.
 
+I used the test results to identify these differences and make adjustments. One recorded test run completed with 10 passing tests; the final test results should be checked again before submission.
 
+## 6. Performance Benchmark
 
-\*\*AI assistance:\*\* Discussed project structure, reconciliation metrics, validation, discrepancy reporting, and submission planning.
+I generated synthetic order datasets using a fixed random seed and ran the reconciliation benchmark on 100,000 source rows and 100,000 target rows.
 
+The recorded run took 25.4225 seconds. The reported throughput was 3,933.53 source rows per second, and peak traced Python memory was 37.64 MB.
 
+The reconciliation identified one source-only record, one target-only record, and one field mismatch. These measurements represent a single run on my local environment, so results may vary on different systems.
 
-\*\*Developer responsibility:\*\* Review the challenge requirements and decide which components to implement.
+## 7. Documentation and GitHub
 
+I used AI assistance to improve the README, document the system architecture, explain the data fields, and organize the submission materials. I also received guidance on Git commands, commits, and publishing the project to GitHub.
 
+Project repository: https://github.com/ErrabelliSathvik/datarecon
 
-\## 2. Reconciliation Engine
+## Final Notes
 
+AI assistance was part of my development process, but its suggestions still needed to be checked against the implementation and test results. I need to understand the code, the design decisions, and the limitations of the project before presenting it.
 
-
-\*\*Goal:\*\* Compare source and target order datasets.
-
-
-
-\*\*AI assistance:\*\* Discussed business-key comparison, source-only and target-only records, field-level mismatches, row counts, and aggregate comparisons.
-
-
-
-\*\*Verification:\*\* Automated reconciliation tests and a 100,000-row benchmark.
-
-
-
-\## 3. Data Validation and Quarantine
-
-
-
-\*\*Goal:\*\* Reject invalid records while preserving useful diagnostic information.
-
-
-
-\*\*AI assistance:\*\* Helped develop validation logic for required fields, numeric amounts, dates, permitted statuses, duplicate business keys, source row numbers, and rejection reasons.
-
-
-
-\*\*Verification:\*\* Validation and edge-case tests.
-
-
-
-\## 4. Database Publishing and Reliability
-
-
-
-\*\*Goal:\*\* Publish validated records to SQLite and prevent unsafe batch replays.
-
-
-
-\*\*AI assistance:\*\* Discussed business-key upserts, batch identifiers, content hashes, and replay behavior.
-
-
-
-\*\*Verification:\*\* Publishing tests for repeated batches, updates, changed batch content, duplicate keys, and negative amounts.
-
-
-
-\## 5. Automated Testing
-
-
-
-\*\*Goal:\*\* Test normal operation and data-quality edge cases.
-
-
-
-\*\*AI assistance:\*\* Helped draft tests for empty inputs, missing values, malformed amounts, duplicate keys, reconciliation differences, and publishing behavior.
-
-
-
-\*\*Observed result:\*\* A test run reported 10 passing tests. Rerun the full suite before final submission to confirm the latest result.
-
-
-
-\## 6. Benchmarking
-
-
-
-\*\*Goal:\*\* Measure reconciliation performance using reproducible synthetic datasets.
-
-
-
-\*\*AI assistance:\*\* Helped structure the benchmark workflow and interpret its output.
-
-
-
-\*\*Observed benchmark results:\*\*
-
-\- Source rows: 100,000
-
-\- Target rows: 100,000
-
-\- Elapsed time: 25.4225 seconds
-
-\- Source-row throughput: 3,933.53 rows/second
-
-\- Peak traced Python memory: 37.64 MB
-
-\- Source-only records: 1
-
-\- Target-only records: 1
-
-\- Field mismatches: 1
-
-
-
-\*\*Limitation:\*\* These are measurements from one run, not a repeated-run performance study.
-
-
-
-\## 7. Documentation and Submission
-
-
-
-\*\*Goal:\*\* Prepare the README, architecture documentation, dependency list, and GitHub repository.
-
-
-
-\*\*AI assistance:\*\* Helped draft documentation and guided Git configuration, commits, and pushing the repository.
-
-
-
-\*\*Repository:\*\* https://github.com/ErrabelliSathvik/datarecon
-
-
-
-\## Developer Review and Responsibility
-
-
-
-AI-generated suggestions were treated as development assistance, not as proof of correctness. Code was tested locally, and implementation choices and limitations should be reviewed by the developer before submission.
-
-
-
-\## Important Note
-
-
-
-This file is a summary, not a verbatim transcript of every AI interaction. Include the actual prompt history separately if required by the challenge guidelines. Do not claim that unverified code, tests, or features were completed successfully.
-
-
-
+This document summarizes the main areas of AI assistance and is not a verbatim record of every prompt and response. If the challenge requires the original prompt history, that should be included separately.
