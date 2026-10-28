@@ -1,6 +1,4 @@
-
 import pandas as pd
-import pytest
 
 from datarecon.validation import validate_orders
 
@@ -15,9 +13,9 @@ COLUMNS = [
 
 
 def test_empty_dataset_is_valid_empty_input():
-    empty = pd.DataFrame(columns=COLUMNS)
+    data = pd.DataFrame(columns=COLUMNS)
 
-    valid, rejected = validate_orders(empty)
+    valid, rejected = validate_orders(data)
 
     assert valid.empty
     assert rejected.empty
