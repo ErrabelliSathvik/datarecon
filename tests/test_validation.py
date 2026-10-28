@@ -1,4 +1,3 @@
-
 import pandas as pd
 import pytest
 
@@ -34,10 +33,10 @@ def test_quarantines_invalid_orders():
 
     assert len(valid) == 1
     assert len(rejected) == 2
-    assert "negative_amount" in rejected.iloc[0]["rejection_reason"] or (
-        "negative_amount" in ";".join(rejected["rejection_reason"])
-    )
-    assert "invalid_status" in ";".join(rejected["rejection_reason"])
+
+    rejection_reasons = ";".join(rejected["rejection_reason"])
+    assert "negative_amount" in rejection_reasons
+    assert "invalid_status" in rejection_reasons
 
 
 def test_rejects_missing_schema_column():
