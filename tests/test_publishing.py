@@ -123,3 +123,92 @@ def test_negative_amount_is_rejected(tmp_path):
         publish_orders(
             orders, database, "batch_001", "source.csv"
         )
+
+
+def test_failed_publish_rolls_back_and_can_be_retried(tmp_path):
+    database = str(tmp_path / "target.db")
+
+    # Seed the database with one existing order.
+    publish_orders(
+        sample_orders().iloc[[0]],
+        database,
+        "batch_initial",
+        "source.csv",
+    )
+
+    # The new order is inserted first; updating the existing order
+    # will then trigger a simulated database failure.
+    failing_orders = pd.concat(
+        [
+            sample_orders().iloc[[1]],
+            sample_orders().iloc[[0]],
+        ],
+        ignore_index=True,
+    )
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("""
+            CREATE TRIGGER fail_order_update
+            BEFORE UPDATE ON target_orders
+            BEGIN
+                SELECT RAISE(ABORT, 'simulated publish failure');
+            END
+        """)
+
+    with pytest.raises(
+        sqlite3.IntegrityError,
+        match="simulated publish failure",
+    ):
+        publish_orders(
+            failing_orders,
+            database,
+            "batch_retry",
+            "source.csv",
+        )
+
+    # The failed transaction must leave neither the inserted order
+    # nor the published-batch record behind.
+    with sqlite3.connect(database) as connection:
+        order_ids = {
+            row[0]
+            for row in connection.execute(
+                "SELECT order_id FROM target_orders"
+            ).fetchall()
+        }
+
+        batch = connection.execute(
+            "SELECT batch_id FROM published_batches "
+            "WHERE batch_id = 'batch_retry'"
+        ).fetchone()
+
+        connection.execute("DROP TRIGGER fail_order_update")
+
+    assert order_ids == {"1001"}
+    assert batch is None
+
+    # Retrying the same batch after the simulated failure is removed
+    # should publish successfully.
+    result = publish_orders(
+        failing_orders,
+        database,
+        "batch_retry",
+        "source.csv",
+    )
+
+    assert result["already_published"] is False
+
+    with sqlite3.connect(database) as connection:
+        order_ids = {
+            row[0]
+            for row in connection.execute(
+                "SELECT order_id FROM target_orders"
+            ).fetchall()
+        }
+
+        published_batch = connection.execute(
+            "SELECT batch_id FROM published_batches "
+            "WHERE batch_id = 'batch_retry'"
+        ).fetchone()
+
+    assert order_ids == {"1001", "1002"}
+    assert published_batch == ("batch_retry",)
