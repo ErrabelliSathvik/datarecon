@@ -1,4 +1,3 @@
-
 import hashlib
 import json
 import sqlite3
@@ -17,7 +16,7 @@ REQUIRED_COLUMNS = [
 
 
 def initialize_target(database_path: str) -> None:
-    """Initialize target tables and the batch replay ledger."""
+    """Create the database tables if they do not exist."""
 
     Path(database_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -45,19 +44,19 @@ def initialize_target(database_path: str) -> None:
 
 
 def _validate_and_prepare(dataframe: pd.DataFrame) -> pd.DataFrame:
-    missing = set(REQUIRED_COLUMNS) - set(dataframe.columns)
-    if missing:
-        raise ValueError(f"Missing columns: {sorted(missing)}")
+    missing_columns = set(REQUIRED_COLUMNS) - set(dataframe.columns)
+    if missing_columns:
+        raise ValueError(
+            f"Missing columns: {sorted(missing_columns)}"
+        )
 
     df = dataframe[REQUIRED_COLUMNS].copy()
 
     if df.isna().any().any():
         raise ValueError("Publishing data contains null required values")
 
-    df["order_id"] = df["order_id"].astype(str)
-    df["customer_id"] = df["customer_id"].astype(str)
-    df["order_date"] = df["order_date"].astype(str)
-    df["status"] = df["status"].astype(str)
+    for column in ["order_id", "customer_id", "order_date", "status"]:
+        df[column] = df[column].astype(str)
 
     if df["order_id"].str.strip().eq("").any():
         raise ValueError("order_id cannot be empty")
@@ -75,19 +74,20 @@ def _validate_and_prepare(dataframe: pd.DataFrame) -> pd.DataFrame:
 
     df["amount"] = amounts.astype(float)
 
-    # Sort by key so row order does not affect the batch fingerprint.
+    # Keep the hash consistent even if rows arrive in a different order.
     return df.sort_values("order_id").reset_index(drop=True)
 
 
 def _content_hash(dataframe: pd.DataFrame) -> str:
     records = dataframe.to_dict(orient="records")
-    canonical = json.dumps(
+    content = json.dumps(
         records,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
     )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def publish_orders(
@@ -96,7 +96,7 @@ def publish_orders(
     batch_id: str,
     source_file: str,
 ) -> dict:
-    """Publish a batch safely and reject reuse of its ID for changed data."""
+    """Publish orders and prevent changed data from reusing a batch ID."""
 
     if not batch_id or not batch_id.strip():
         raise ValueError("batch_id must not be empty")
@@ -110,9 +110,8 @@ def publish_orders(
     initialize_target(database_path)
 
     with sqlite3.connect(database_path) as connection:
-        # A transaction protects the batch ledger and target writes together.
         with connection:
-            previous = connection.execute(
+            previous_batch = connection.execute(
                 """
                 SELECT content_hash, row_count
                 FROM published_batches
@@ -121,8 +120,8 @@ def publish_orders(
                 (batch_id,),
             ).fetchone()
 
-            if previous:
-                if previous[0] != fingerprint:
+            if previous_batch:
+                if previous_batch[0] != fingerprint:
                     raise ValueError(
                         f"Batch ID '{batch_id}' was already used "
                         "with different content"
@@ -136,7 +135,7 @@ def publish_orders(
                     "content_hash": fingerprint,
                 }
 
-            before_count = connection.execute(
+            count_before = connection.execute(
                 "SELECT COUNT(*) FROM target_orders"
             ).fetchone()[0]
 
@@ -179,16 +178,16 @@ def publish_orders(
                 (batch_id, fingerprint, len(df)),
             )
 
-            after_count = connection.execute(
+            count_after = connection.execute(
                 "SELECT COUNT(*) FROM target_orders"
             ).fetchone()[0]
 
     return {
         "batch_id": batch_id,
         "input_count": len(df),
-        "target_count_before": before_count,
-        "target_count_after": after_count,
-        "new_rows": after_count - before_count,
+        "target_count_before": count_before,
+        "target_count_after": count_after,
+        "new_rows": count_after - count_before,
         "already_published": False,
         "content_hash": fingerprint,
     }
