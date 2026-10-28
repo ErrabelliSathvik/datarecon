@@ -1,4 +1,3 @@
-
 import argparse
 import json
 import time
@@ -10,7 +9,7 @@ from datarecon.reconciliation import reconcile
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Benchmark DataRecon reconciliation performance."
+        description="Measure DataRecon reconciliation performance."
     )
     parser.add_argument(
         "--source",
@@ -38,8 +37,9 @@ def main():
             "Input files not found. Run scripts/generate_data.py first."
         )
 
+    # Measure execution time and traced Python memory.
     tracemalloc.start()
-    start = time.perf_counter()
+    start_time = time.perf_counter()
 
     report = reconcile(
         str(source_path),
@@ -47,37 +47,40 @@ def main():
         args.output,
     )
 
-    elapsed = time.perf_counter() - start
+    elapsed = time.perf_counter() - start_time
     _, peak_memory = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
-    row_count = report["source"]["row_count"]
-    result = {
+    source_rows = report["source"]["row_count"]
+    target_rows = report["target"]["row_count"]
+    reconciliation = report["reconciliation"]
+
+    results = {
         "source_file": str(source_path),
         "target_file": str(target_path),
-        "source_rows": row_count,
-        "target_rows": report["target"]["row_count"],
+        "source_rows": source_rows,
+        "target_rows": target_rows,
         "elapsed_seconds": round(elapsed, 4),
         "source_rows_per_second": round(
-            row_count / elapsed if elapsed else 0, 2
+            source_rows / elapsed if elapsed else 0, 2
         ),
         "peak_traced_python_memory_mb": round(
             peak_memory / (1024 * 1024), 2
         ),
-        "reconciliation_matched": report["reconciliation"]["matched"],
-        "source_only_count": report["reconciliation"]["source_only_count"],
-        "target_only_count": report["reconciliation"]["target_only_count"],
-        "field_mismatch_count": report["reconciliation"]["field_mismatch_count"],
+        "reconciliation_matched": reconciliation["matched"],
+        "source_only_count": reconciliation["source_only_count"],
+        "target_only_count": reconciliation["target_only_count"],
+        "field_mismatch_count": reconciliation["field_mismatch_count"],
     }
 
     results_path = Path(args.results)
     results_path.parent.mkdir(parents=True, exist_ok=True)
     results_path.write_text(
-        json.dumps(result, indent=2),
+        json.dumps(results, indent=2),
         encoding="utf-8",
     )
 
-    print(json.dumps(result, indent=2))
+    print(json.dumps(results, indent=2))
     print(f"\nBenchmark results saved to: {results_path}")
 
 
