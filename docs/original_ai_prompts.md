@@ -1,50 +1,55 @@
-# Original AI Prompts --- DataRecon
+# AI Prompt History --- DataRecon
 
 ## Scope and source note
 
-This file records the original prompt text that can be verified in the
-conversation excerpt supplied for the YottaFlex.ai DataRecon challenge.
-The supplied excerpt contains the initial project-planning exchange and
-early Windows/Git setup troubleshooting, but it ends during Git
-installation troubleshooting. It does not contain the complete later
-implementation conversation.
+This document records the AI-assistance history that can be verified
+from the conversation excerpt available for the YottaFlex.ai DataRecon
+challenge. The excerpt contains project-planning context and early
+Windows/Git setup troubleshooting, but it ends during Git installation
+troubleshooting. It does not contain the complete later implementation
+conversation.
 
-This is therefore **not a complete verbatim transcript of every AI
-prompt**. No missing prompts have been invented or reconstructed and
-presented as originals. If additional conversation history becomes
-available, append the exact user messages and identify the source.
+This is **not a complete verbatim transcript of every AI prompt**. The
+available record is incomplete, so this document does not claim to
+reproduce every prompt. No missing prompts have been invented or
+reconstructed as if they were original messages. If additional
+conversation history becomes available, the exact messages can be added.
 
-## Recoverable original prompt
+## Work discussed in the available excerpt
 
-The following user message appears verbatim in the supplied conversation
-excerpt:
+The conversation covered the YottaFlex.ai challenge requirements and
+planning for a data reconciliation pipeline. The stated project
+objective was to compare source and target datasets using row counts,
+business keys, aggregates, and field-level checks; produce a
+machine-readable reconciliation report; and isolate mismatched records.
 
-> help me to build it from scratch
+The planning discussion covered: - Python, pandas, SQLite, and pytest as
+a proposed local stack. - A modular project structure for validation,
+reconciliation, publishing, tests, sample data, and documentation. -
+Data-quality checks, quarantine/reject handling, idempotent reruns,
+operational metrics, reproducible data, and performance measurement. -
+Initial Windows environment setup and troubleshooting access to Git from
+Command Prompt.
 
-## Context supplied for the task
+This section summarizes the content of the available record; it is **not
+a verbatim transcript of individual prompts**.
 
-The conversation excerpt also contains the YottaFlex.ai 72-hour code
-challenge brief. Its central requirement was to build a data-engineering
-solution that compares source and target datasets using row counts,
-business keys, aggregates, and field-level checks; produces a
-machine-readable reconciliation report; and isolates mismatched records.
+## AI assistance and verification
 
-The brief required, among other things, schema and business-rule
-validation, quarantine/reject handling, operational metrics, automated
-tests, idempotent reruns, reproducible sample data, correctness
-evidence, performance measurement, and documentation.
+AI assistance was used during planning and development. The project
+owner should be prepared to explain the implementation, design choices,
+dependencies, limitations, and test results, and should describe
+accurately which parts they reviewed, changed, ran, and validated.
 
-This section summarizes the challenge context; it is **not represented
-as a verbatim AI prompt**.
+The current test output supplied during the conversation shows 10 tests
+passing. This is evidence for those tests only; it does not establish
+that every challenge requirement or edge case is covered.
 
 ## Recovery limitation
 
-The supplied text file ends during early Git installation
-troubleshooting. Later work on implementation, testing, benchmarking,
-and documentation is not included in that excerpt. Consequently, the
-exact user prompts for those later steps cannot be verified from this
-source alone.
-
-The existing `docs/ai_prompt_history.md` should remain the summary of
-how AI assistance was used. This file records only the recoverable
-original prompt and the limitation of the available conversation record.
+The supplied conversation excerpt ends during early Git installation
+troubleshooting. The exact user prompts from later implementation,
+debugging, testing, benchmarking, and documentation work cannot be
+verified from this excerpt alone. The separate
+`docs/ai_prompt_history.md` summary should be kept consistent with this
+limitation and with the work actually performed.
