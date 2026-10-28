@@ -1,4 +1,3 @@
-
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,13 +20,13 @@ def reconcile(
     target_path: str,
     output_dir: str,
 ) -> dict:
-    """Compare source and target orders and save reconciliation outputs."""
+    """Compare two order datasets and save the results."""
 
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     started_at = datetime.now(timezone.utc)
+    run_id = started_at.strftime("%Y%m%dT%H%M%S%fZ")
 
-    output = Path(output_dir)
-    output.mkdir(parents=True, exist_ok=True)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     source = pd.read_csv(source_path)
     target = pd.read_csv(target_path)
@@ -35,14 +34,14 @@ def reconcile(
     required_columns = [KEY_COLUMN, *COMPARE_COLUMNS]
 
     for name, dataframe in [("source", source), ("target", target)]:
-        missing = set(required_columns) - set(dataframe.columns)
-        if missing:
+        missing_columns = set(required_columns) - set(dataframe.columns)
+
+        if missing_columns:
             raise ValueError(
-                f"{name} dataset is missing columns: {sorted(missing)}"
+                f"{name} dataset is missing columns: "
+                f"{sorted(missing_columns)}"
             )
 
-    # A primary key must exist and be unique.
-    for name, dataframe in [("source", source), ("target", target)]:
         if dataframe[KEY_COLUMN].isna().any():
             raise ValueError(f"{name} contains null order_id values")
 
@@ -61,16 +60,15 @@ def reconcile(
 
     mismatches = []
 
-    for key in common_keys:
+    for order_id in common_keys:
         for column in COMPARE_COLUMNS:
-            source_value = source.at[key, column]
-            target_value = target.at[key, column]
+            source_value = source.at[order_id, column]
+            target_value = target.at[order_id, column]
 
-            # Treat two missing values as equal.
+            # Two missing values are treated as equal.
             if pd.isna(source_value) and pd.isna(target_value):
                 continue
 
-            # Numeric amounts must be compared numerically.
             if column == "amount":
                 equal = (
                     pd.notna(source_value)
@@ -86,7 +84,7 @@ def reconcile(
 
             if not equal:
                 mismatches.append({
-                    "order_id": str(key),
+                    "order_id": str(order_id),
                     "column": column,
                     "source_value": (
                         None if pd.isna(source_value) else str(source_value)
@@ -96,12 +94,12 @@ def reconcile(
                     ),
                 })
 
-    # Aggregate only records whose business keys exist in both datasets.
+    # Compare totals for orders present in both datasets.
     source_common = source.loc[common_keys]
     target_common = target.loc[common_keys]
 
-    source_amount = float(source_common["amount"].sum())
-    target_amount = float(target_common["amount"].sum())
+    source_common_amount = float(source_common["amount"].sum())
+    target_common_amount = float(target_common["amount"].sum())
 
     report = {
         "run_id": run_id,
@@ -122,10 +120,10 @@ def reconcile(
             "target_only_count": len(target_only_keys),
             "field_mismatch_count": len(mismatches),
             "common_key_count": len(common_keys),
-            "common_key_source_amount": source_amount,
-            "common_key_target_amount": target_amount,
+            "common_key_source_amount": source_common_amount,
+            "common_key_target_amount": target_common_amount,
             "common_key_amount_difference": (
-                source_amount - target_amount
+                source_common_amount - target_common_amount
             ),
             "matched": (
                 not source_only_keys
@@ -135,18 +133,20 @@ def reconcile(
         },
     }
 
-    (output / "reconciliation_report.json").write_text(
+    (output_dir / "reconciliation_report.json").write_text(
         json.dumps(report, indent=2),
         encoding="utf-8",
     )
 
-    pd.DataFrame(
-        {"order_id": source_only_keys}
-    ).to_csv(output / "source_only.csv", index=False)
+    pd.DataFrame({"order_id": source_only_keys}).to_csv(
+        output_dir / "source_only.csv",
+        index=False,
+    )
 
-    pd.DataFrame(
-        {"order_id": target_only_keys}
-    ).to_csv(output / "target_only.csv", index=False)
+    pd.DataFrame({"order_id": target_only_keys}).to_csv(
+        output_dir / "target_only.csv",
+        index=False,
+    )
 
     pd.DataFrame(
         mismatches,
@@ -156,6 +156,6 @@ def reconcile(
             "source_value",
             "target_value",
         ],
-    ).to_csv(output / "field_mismatches.csv", index=False)
+    ).to_csv(output_dir / "field_mismatches.csv", index=False)
 
     return report
