@@ -224,33 +224,71 @@ This is a local CSV-to-SQLite prototype. Performance depends on dataset size and
 
 
 
-\## Performance
+\## Performance Benchmark
 
 
 
-Benchmark results should be added after running the benchmark script. Report the actual row count, runtime, throughput, memory measurement, and test results.
+\### Test Configuration
 
 
 
-\## Submission Checklist
+\- \*\*Source dataset:\*\* 100,000 rows
+
+\- \*\*Target dataset:\*\* 100,000 rows
+
+\- \*\*Random seed:\*\* 42
+
+\- \*\*Environment:\*\* Windows, Python 3.15.1
+
+\- \*\*Benchmark duration:\*\* 25.4225 seconds
 
 
 
-\- \[ ] Source code and tests included.
+\### Measured Results
 
-\- \[ ] Dependencies listed in `requirements.txt`.
 
-\- \[ ] Sample datasets included.
 
-\- \[ ] Installation and execution commands verified.
+| Metric | Result |
 
-\- \[ ] Architecture and trade-offs documented.
+|---|---:|
 
-\- \[ ] AI prompt history included as required.
+| Source rows | 100,000 |
 
-\- \[ ] Public GitHub repository verified.
+| Target rows | 100,000 |
 
-\- \[ ] No secrets or API keys committed.
+| Elapsed time | 25.42 seconds |
+
+| Source-row throughput | 3,933.53 rows/second |
+
+| Peak traced Python memory | 37.64 MB |
+
+| Source-only records | 1 |
+
+| Target-only records | 1 |
+
+| Field mismatches | 1 |
+
+| Common business keys | 99,999 |
+
+
+
+\### Correctness
+
+
+
+The benchmark detected one source-only record, one target-only record, and one field-level mismatch. The reconciliation correctly reported `matched: false`.
+
+
+
+The source and target contain the same number of rows, but equal row counts do not imply equivalent datasets.
+
+
+
+\### Limitations
+
+
+
+These measurements represent a single benchmark run and may vary with hardware, system load, and dataset characteristics. Traced Python memory is not the same as total process memory. Further repeated runs would be needed for a more robust performance evaluation.
 
 
 
