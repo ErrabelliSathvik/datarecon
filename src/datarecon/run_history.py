@@ -1,15 +1,14 @@
-
 import sqlite3
 from pathlib import Path
 
 
 def initialize_database(database_path: str) -> None:
-    """Create the run history table if it does not exist."""
+    """Create the run history table if needed."""
 
-    path = Path(database_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    database = Path(database_path)
+    database.parent.mkdir(parents=True, exist_ok=True)
 
-    with sqlite3.connect(path) as connection:
+    with sqlite3.connect(database) as connection:
         connection.execute("""
             CREATE TABLE IF NOT EXISTS pipeline_runs (
                 run_id TEXT PRIMARY KEY,
@@ -28,10 +27,9 @@ def initialize_database(database_path: str) -> None:
 
 
 def record_run(database_path: str, report: dict) -> None:
-    """Insert or update a pipeline run using its stable run ID."""
+    """Save a pipeline run, updating it if the run ID already exists."""
 
     initialize_database(database_path)
-
     validation = report.get("validation", {})
 
     with sqlite3.connect(database_path) as connection:
@@ -70,14 +68,16 @@ def record_run(database_path: str, report: dict) -> None:
 
 
 def get_runs(database_path: str) -> list[dict]:
-    """Return run history ordered by start time."""
+    """Return pipeline runs from newest to oldest."""
 
     initialize_database(database_path)
 
     with sqlite3.connect(database_path) as connection:
         connection.row_factory = sqlite3.Row
         rows = connection.execute("""
-            SELECT * FROM pipeline_runs ORDER BY started_at DESC
+            SELECT *
+            FROM pipeline_runs
+            ORDER BY started_at DESC
         """).fetchall()
 
     return [dict(row) for row in rows]
