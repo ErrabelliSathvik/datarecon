@@ -1,17 +1,27 @@
-
+# Python virtual environment
 .venv/
+
+# Python cache files
 __pycache__/
-.pytest_cache/
 *.py[cod]
+
+# Pytest cache
+.pytest_cache/
+
+# Environment variables and local secrets
 .env
 .env.*
 !.env.example
 
+# Generated outputs and test data
 outputs/
 data/generated/
+
+# Local database files
 *.db
 *.sqlite
 *.sqlite3
 
+# Editor settings
 .vscode/
 .idea/
