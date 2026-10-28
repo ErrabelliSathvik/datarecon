@@ -1,4 +1,3 @@
-
 import sqlite3
 
 import pandas as pd
@@ -30,24 +29,23 @@ def test_rerunning_batch_does_not_duplicate_orders(tmp_path):
     database = str(tmp_path / "target.db")
     orders = sample_orders()
 
-    first = publish_orders(
+    first_run = publish_orders(
         orders, database, "batch_001", "source.csv"
     )
-    second = publish_orders(
+    second_run = publish_orders(
         orders, database, "batch_001", "source.csv"
     )
 
-    assert first["target_count_after"] == 2
+    assert first_run["target_count_after"] == 2
 
-    # Confirm the database contains no duplicate orders.
     with sqlite3.connect(database) as connection:
-        count = connection.execute(
+        order_count = connection.execute(
             "SELECT COUNT(*) FROM target_orders"
         ).fetchone()[0]
 
-    assert count == 2
-    assert second["new_rows"] == 0
-    assert second["already_published"] is True
+    assert order_count == 2
+    assert second_run["new_rows"] == 0
+    assert second_run["already_published"] is True
 
 
 def test_new_batch_updates_existing_order(tmp_path):
@@ -57,25 +55,30 @@ def test_new_batch_updates_existing_order(tmp_path):
         sample_orders(), database, "batch_001", "source.csv"
     )
 
-    changed = sample_orders()
-    changed.loc[changed["order_id"] == "1001", "amount"] = 750.0
+    updated_orders = sample_orders()
+    updated_orders.loc[
+        updated_orders["order_id"] == "1001", "amount"
+    ] = 750.0
 
     result = publish_orders(
-        changed, database, "batch_002", "updated_source.csv"
+        updated_orders,
+        database,
+        "batch_002",
+        "updated_source.csv",
     )
 
     with sqlite3.connect(database) as connection:
-        row = connection.execute(
+        order = connection.execute(
             "SELECT amount, batch_id FROM target_orders "
             "WHERE order_id = '1001'"
         ).fetchone()
 
-        count = connection.execute(
+        order_count = connection.execute(
             "SELECT COUNT(*) FROM target_orders"
         ).fetchone()[0]
 
-    assert row == (750.0, "batch_002")
-    assert count == 2
+    assert order == (750.0, "batch_002")
+    assert order_count == 2
     assert result["new_rows"] == 0
 
 
@@ -87,12 +90,12 @@ def test_same_batch_id_with_changed_data_is_rejected(tmp_path):
         orders, database, "batch_001", "source.csv"
     )
 
-    changed = orders.copy()
-    changed.loc[0, "amount"] = 999.0
+    changed_orders = orders.copy()
+    changed_orders.loc[0, "amount"] = 999.0
 
     with pytest.raises(ValueError, match="different content"):
         publish_orders(
-            changed, database, "batch_001", "source.csv"
+            changed_orders, database, "batch_001", "source.csv"
         )
 
 
@@ -100,14 +103,14 @@ def test_duplicate_order_ids_are_rejected(tmp_path):
     database = str(tmp_path / "target.db")
     orders = sample_orders()
 
-    duplicate = pd.concat(
+    duplicate_orders = pd.concat(
         [orders, orders.iloc[[0]]],
         ignore_index=True,
     )
 
     with pytest.raises(ValueError, match="Duplicate"):
         publish_orders(
-            duplicate, database, "batch_001", "source.csv"
+            duplicate_orders, database, "batch_001", "source.csv"
         )
 
 
