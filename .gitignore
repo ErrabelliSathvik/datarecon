@@ -1,0 +1,17 @@
+
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.env
+.env.*
+!.env.example
+
+outputs/
+data/generated/
+*.db
+*.sqlite
+*.sqlite3
+
+.vscode/
+.idea/
