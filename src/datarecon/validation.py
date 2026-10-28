@@ -1,4 +1,3 @@
-
 import pandas as pd
 
 
@@ -19,16 +18,7 @@ VALID_STATUSES = {
 
 
 def validate_orders(dataframe: pd.DataFrame):
-    """
-    Validate and normalize order records.
-
-    Returns:
-        valid: Clean, normalized records.
-        rejected: Original input fields with source_row_number
-                  and rejection_reason.
-
-    Row numbers are 1-based data-row numbers, excluding the header.
-    """
+    """Separate valid orders from records that fail validation."""
 
     if not isinstance(dataframe, pd.DataFrame):
         raise TypeError("Input must be a pandas DataFrame")
@@ -44,21 +34,19 @@ def validate_orders(dataframe: pd.DataFrame):
             f"Missing required columns: {missing_columns}"
         )
 
-    # Reset the index to ensure positional alignment.
     original = dataframe.copy().reset_index(drop=True)
     original_columns = list(original.columns)
     row_count = len(original)
 
-    # Explicitly assign 1-based data-row numbers.
+    # Keep the original data-row position for the rejection report.
     source_row_numbers = list(range(1, row_count + 1))
-
     working = original.copy()
     working["_source_row_number"] = source_row_numbers
 
     reasons = [[] for _ in range(row_count)]
 
     def reject(mask, reason):
-        """Record a reason for each invalid row."""
+        """Add a rejection reason to each matching row."""
         mask = pd.Series(mask).reset_index(drop=True)
         mask = mask.fillna(False).astype(bool)
 
@@ -66,83 +54,46 @@ def validate_orders(dataframe: pd.DataFrame):
             if invalid:
                 reasons[position].append(reason)
 
-    # 1. Required-field validation.
+    # Check that required fields are present.
     for column in REQUIRED_COLUMNS:
         values = working[column].astype("string").str.strip()
-
         missing = (
             working[column].isna()
             | values.eq("").fillna(False)
         )
 
-        reject(
-            missing,
-            f"missing_required_field:{column}",
-        )
+        reject(missing, f"missing_required_field:{column}")
 
-    # 2. Amount validation.
-    numeric_amount = pd.to_numeric(
-        working["amount"],
-        errors="coerce",
-    )
+    # Check that amounts are numeric and nonnegative.
+    amounts = pd.to_numeric(working["amount"], errors="coerce")
 
-    reject(
-        numeric_amount.isna(),
-        "invalid_amount",
-    )
+    reject(amounts.isna(), "invalid_amount")
+    reject(amounts.lt(0).fillna(False), "negative_amount")
 
-    reject(
-        numeric_amount.lt(0).fillna(False),
-        "negative_amount",
-    )
+    # Check that order dates can be parsed.
+    dates = pd.to_datetime(working["order_date"], errors="coerce")
+    reject(dates.isna(), "invalid_order_date")
 
-    # 3. Date validation.
-    parsed_dates = pd.to_datetime(
-        working["order_date"],
-        errors="coerce",
-    )
-
-    reject(
-        parsed_dates.isna(),
-        "invalid_order_date",
-    )
-
-    # 4. Status validation.
-    normalized_status = (
+    # Normalize statuses before checking the allowed values.
+    statuses = (
         working["status"]
         .astype("string")
         .str.strip()
         .str.lower()
     )
 
-    reject(
-        ~normalized_status.isin(VALID_STATUSES),
-        "invalid_status",
+    reject(~statuses.isin(VALID_STATUSES), "invalid_status")
+
+    # Order IDs must be present and unique.
+    order_ids = working["order_id"].astype("string").str.strip()
+    has_order_id = (
+        order_ids.notna()
+        & order_ids.ne("").fillna(False)
     )
 
-    # 5. Business-key validation.
-    normalized_key = (
-        working["order_id"]
-        .astype("string")
-        .str.strip()
-    )
+    duplicates = order_ids.duplicated(keep=False) & has_order_id
+    reject(duplicates, "duplicate_order_id")
 
-    nonempty_key = (
-        normalized_key.notna()
-        & normalized_key.ne("").fillna(False)
-    )
-
-    duplicate_key = (
-        normalized_key.duplicated(keep=False)
-        & nonempty_key
-    )
-
-    reject(
-        duplicate_key,
-        "duplicate_order_id",
-    )
-
-    # 6. Separate valid and rejected records by position.
     rejected_positions = [
         position
         for position, row_reasons in enumerate(reasons)
@@ -155,16 +106,13 @@ def validate_orders(dataframe: pd.DataFrame):
         if not row_reasons
     ]
 
-    # Quarantine retains original field values.
+    # Keep the original values for records that need review.
     rejected = original.iloc[rejected_positions].copy()
 
     rejected.insert(
         0,
         "source_row_number",
-        [
-            source_row_numbers[position]
-            for position in rejected_positions
-        ],
+        [source_row_numbers[position] for position in rejected_positions],
     )
 
     rejected["rejection_reason"] = [
@@ -172,16 +120,11 @@ def validate_orders(dataframe: pd.DataFrame):
         for position in rejected_positions
     ]
 
-    # Normalize only valid records.
+    # Clean up records that passed all validation checks.
     valid = original.iloc[valid_positions].copy()
 
-    valid["order_id"] = (
-        valid["order_id"].astype(str).str.strip()
-    )
-
-    valid["customer_id"] = (
-        valid["customer_id"].astype(str).str.strip()
-    )
+    valid["order_id"] = valid["order_id"].astype(str).str.strip()
+    valid["customer_id"] = valid["customer_id"].astype(str).str.strip()
 
     valid["order_date"] = pd.to_datetime(
         valid["order_date"],
