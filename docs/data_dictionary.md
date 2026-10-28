@@ -1,94 +1,52 @@
-\# Data Dictionary
+# Data Dictionary
 
+## Orders
 
-
-\## Entity: Orders
-
-
-
-\*\*Grain:\*\* One record per `order\_id`.
-
-
+Each row represents one order, identified by its `order_id`.
 
 | Column | Type | Required | Description |
-
 |---|---|---|---|
+| `order_id` | String | Yes | Unique identifier for an order |
+| `customer_id` | String | Yes | ID of the customer who placed the order |
+| `order_date` | ISO date | Yes | Date when the order was placed |
+| `amount` | Decimal | Yes | Order amount, which cannot be negative |
+| `status` | String | Yes | Current status: `pending`, `completed`, `shipped`, or `cancelled` |
 
-| `order\_id` | String | Yes | Unique order business key |
+## Validation Rules
 
-| `customer\_id` | String | Yes | Identifier of the customer |
+Before comparing the datasets, DataRecon checks that:
 
-| `order\_date` | ISO date | Yes | Date the order was placed |
+- Every order has an `order_id`, and the ID is unique within its dataset.
+- `customer_id` is provided.
+- `order_date` contains a valid date.
+- `amount` is numeric and is not negative.
+- `status` is one of the supported values listed above.
 
-| `amount` | Decimal | Yes | Order amount; must be nonnegative |
+Records are matched between the source and target using `order_id`. For orders found in both datasets, DataRecon compares the other fields to identify differences.
 
-| `status` | String | Yes | One of pending, completed, shipped, cancelled |
+## Reconciliation Results
 
+The reconciliation report contains the following fields.
 
-
-\### Business Rules
-
-
-
-\- `order\_id` must be non-null and unique within each input dataset.
-
-\- `customer\_id` must be present.
-
-\- `order\_date` must be parseable as a date.
-
-\- `amount` must be numeric and nonnegative.
-
-\- `status` must belong to the configured set of supported statuses.
-
-\- Source and target records are matched using `order\_id`.
-
-\- Other fields are compared for records with matching keys.
-
-
-
-\## Reconciliation Outputs
-
-
-
-| Field | Meaning |
-
+| Field | Description |
 |---|---|
+| `run_id` | Unique ID for the pipeline execution |
+| `row_count_difference` | Difference between source and target row counts |
+| `source_only_count` | Number of orders found only in the source |
+| `target_only_count` | Number of orders found only in the target |
+| `field_mismatch_count` | Number of field comparisons that differ |
+| `common_key_count` | Number of order IDs present in both datasets |
+| `matched` | Indicates whether the compared records reconcile successfully |
 
-| `run\_id` | Unique execution identifier |
+## Database Tables
 
-| `row\_count\_difference` | Source count minus target count |
+The SQLite `target_orders` table stores order details along with the `batch_id` and `source_file` used during publishing.
 
-| `source\_only\_count` | Number of source keys missing from target |
+The `pipeline_runs` table keeps a record of pipeline executions, including their status, timestamps, and validation counts.
 
-| `target\_only\_count` | Number of target keys absent from source |
+## Assumptions and Limitations
 
-| `field\_mismatch\_count` | Number of differing field comparisons |
-
-| `common\_key\_count` | Number of keys present in both datasets |
-
-| `matched` | Whether keys and compared field values reconcile |
-
-
-
-\## Publishing Metadata
-
-
-
-The SQLite `target\_orders` table stores order attributes plus `batch\_id` and `source\_file`. The `pipeline\_runs` table stores execution status, timestamps, and validation counts.
-
-
-
-\## Assumptions and Limitations
-
-
-
-\- Customer IDs are identifiers, but a customer master dataset is not currently validated.
-
-\- Amount aggregates use floating-point values in the current implementation; integer minor units or decimal arithmetic would be preferable for strict financial precision.
-
-\- Full source-row preservation in quarantine is not yet implemented.
-
-\- Historical order changes are overwritten in the target table rather than preserved as versions.
-
-
-
+- Customer IDs are checked for presence, but they are not validated against a separate customer master dataset.
+- Amount calculations currently use floating-point values. Decimal arithmetic or integer values in minor currency units would be more suitable when exact financial precision is required.
+- Quarantined records do not yet preserve the complete original source row in every case.
+- When an existing order changes, the target table is updated rather than keeping a separate history of previous versions.
